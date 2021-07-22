@@ -43,6 +43,6 @@ func (p *ServiceAutonomyEnhancementOptions) String() string {
 	return fmt.Sprintf("%#v", *p)
 }
 
-func (i *ServiceAutonomyEnhancementOptions) Type() string {
+func (*ServiceAutonomyEnhancementOptions) Type() string {
 	return "ServiceAutonomyEnhancement"
 }

@@ -41,7 +41,7 @@ type storageCache struct {
 	servicesMap  map[types.NamespacedName]*serviceContainer
 	endpointsMap map[types.NamespacedName]*endpointsContainer
 	nodesMap     map[types.NamespacedName]*nodeContainer
-	localAppInfo map[string]serf.Member
+	localAppInfo map[types.NamespacedName][]serf.Member
 
 	// service watch channel
 	serviceChan chan<- watch.Event
@@ -79,7 +79,7 @@ func NewStorageCache(hostName string, wrapperInCluster, serviceAutonomyEnhanceme
 		nodesMap:                          make(map[types.NamespacedName]*nodeContainer),
 		serviceChan:                       serviceNotifier,
 		endpointsChan:                     endpointsNotifier,
-		localAppInfo:                      make(map[string]serf.Member),
+		localAppInfo:                      make(map[types.NamespacedName][]serf.Member),
 	}
 
 	return msc
@@ -143,7 +143,7 @@ func (sc *storageCache) GetNode(hostName string) *v1.Node {
 	return nil
 }
 
-func (sc *storageCache) SetLocalAppInfo(info map[string]serf.Member) {
+func (sc *storageCache) SetLocalAppInfo(info map[types.NamespacedName][]serf.Member) {
 	klog.V(4).Infof("Set local node info %#v", info)
 	sc.mu.Lock()
 	sc.localAppInfo = info
@@ -161,25 +161,8 @@ func (sc *storageCache) SetLocalAppInfo(info map[string]serf.Member) {
 func (sc *storageCache) ClearLocalAppInfo() {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
-	sc.localAppInfo = make(map[string]serf.Member)
+	sc.localAppInfo = make(map[types.NamespacedName][]serf.Member)
 }
-
-// rebuildEndpointsMap updates all endpoints stored in storageCache.endpointsMap dynamically and constructs relevant modified events
-//func (sc *storageCache) rebuildEndpointsMap() []watch.Event {
-//	evts := make([]watch.Event, 0)
-//	for name, endpointsContainer := range sc.endpointsMap {
-//		newEps := pruneEndpoints(sc.hostName, sc.nodesMap, sc.servicesMap, endpointsContainer.endpoints, sc.localNodeInfo, sc.wrapperInCluster, sc.serviceAutonomyEnhancementEnabled)
-//		if apiequality.Semantic.DeepEqual(newEps, endpointsContainer.modified) {
-//			continue
-//		}
-//		sc.endpointsMap[name].modified = newEps
-//		evts = append(evts, watch.Event{
-//			Type:   watch.Modified,
-//			Object: newEps,
-//		})
-//	}
-//	return evts
-//}
 
 func (sc *storageCache) rebuildEndpointsMap() []watch.Event {
 	evts := make([]watch.Event, 0)

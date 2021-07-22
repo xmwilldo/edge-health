@@ -8,16 +8,19 @@ import (
 	"time"
 
 	"github.com/hashicorp/serf/serf"
-	"github.com/xmwilldo/edge-service-autonomy/pkg/util"
 	log "k8s.io/klog"
+	"k8s.io/klog/v2"
+
+	"github.com/xmwilldo/edge-service-autonomy/pkg/util"
 )
 
 func Server(ctx context.Context, wg *sync.WaitGroup, serf *serf.Serf) {
 	srv := &http.Server{Addr: ":" + "8888"}
 	http.HandleFunc("/localinfo", func(w http.ResponseWriter, r *http.Request) {
-		member := serf.Members()
-		data, err := json.Marshal(member)
+		members := serf.Members()
+		data, err := json.Marshal(members)
 		if err != nil {
+			klog.Errorf("Marshal err: %v", err)
 			return
 		}
 		w.Write(data)

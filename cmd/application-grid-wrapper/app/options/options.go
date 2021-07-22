@@ -37,14 +37,14 @@ type Options struct {
 
 func NewGridWrapperOptions() *Options {
 	return &Options{
-		BindAddress:       "localhost:51006",
+		BindAddress:       "0.0.0.0:9999",
 		InsecureMode:      true,
 		NotifyChannelSize: 100,
 		WrapperInCluster:  true,
 		ServiceAutonomyEnhancementOption: ServiceAutonomyEnhancementOptions{
 			Enabled:        true,
-			UpdateInterval: 30,
-			AppStatusSvc:   "http://localhost:51005/localinfo",
+			UpdateInterval: 5,
+			AppStatusSvc:   "http://10.244.5.35:8888/localinfo",
 		},
 	}
 }

@@ -3,12 +3,16 @@ package options
 import "github.com/spf13/pflag"
 
 type AppHealthOptions struct {
-	JoinIP string
+	JoinIp    string
+	Namespace string
+	SvcName   string
 }
 
 func NewAppHealthOptions() *AppHealthOptions {
 	return &AppHealthOptions{
-		JoinIP: "",
+		JoinIp:    "",
+		Namespace: "",
+		SvcName:   "",
 	}
 }
 
@@ -20,5 +24,7 @@ func (o *AppHealthOptions) AddFlags(fs *pflag.FlagSet) {
 	if o == nil {
 		return
 	}
-	fs.StringVar(&o.JoinIP, "join", o.JoinIP, "Join IP")
+	fs.StringVar(&o.JoinIp, "join", o.JoinIp, "Join IP")
+	fs.StringVar(&o.Namespace, "namespace", o.Namespace, "")
+	fs.StringVar(&o.SvcName, "svc_name", o.SvcName, "")
 }

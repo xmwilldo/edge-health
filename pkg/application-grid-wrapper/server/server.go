@@ -26,6 +26,8 @@ import (
 	"net/http"
 	"time"
 
+	"k8s.io/apimachinery/pkg/types"
+
 	"github.com/xmwilldo/edge-service-autonomy/cmd/application-grid-wrapper/app/options"
 	"github.com/xmwilldo/edge-service-autonomy/pkg/application-grid-wrapper/server/apis"
 	"github.com/xmwilldo/edge-service-autonomy/pkg/application-grid-wrapper/storage"
@@ -223,12 +225,13 @@ func (s *interceptorServer) AppStatusAcquisition() {
 		klog.Errorf("Get local node info: Decode err: %v", err)
 		s.cache.ClearLocalAppInfo()
 		return
-	} else {
-		localAppInfo := map[string]serf.Member{}
-		for _, member := range members {
-			localAppInfo[member.Addr.String()] = member
-		}
-		s.cache.SetLocalAppInfo(localAppInfo)
 	}
+
+	var memberMap = map[types.NamespacedName][]serf.Member{}
+	for _, m := range members {
+		memberMap[types.NamespacedName{Namespace: m.Tags["namespace"], Name: m.Tags["svc_name"]}] = append(memberMap[types.NamespacedName{Namespace: m.Tags["namespace"], Name: m.Tags["svc_name"]}], m)
+	}
+	s.cache.SetLocalAppInfo(memberMap)
+
 	return
 }

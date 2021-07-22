@@ -113,7 +113,7 @@ func genLocalEndpoints(eps *v1.Endpoints) *v1.Endpoints {
 }
 
 func pruneEndpoints(services map[types.NamespacedName]*serviceContainer,
-	eps *v1.Endpoints, localAppInfo map[string]serf.Member,
+	eps *v1.Endpoints, localAppInfo map[types.NamespacedName][]serf.Member,
 	wrapperInCluster, serviceAutonomyEnhancementEnabled bool) *v1.Endpoints {
 
 	epsKey := types.NamespacedName{Namespace: eps.Namespace, Name: eps.Name}
@@ -139,8 +139,8 @@ func pruneEndpoints(services map[types.NamespacedName]*serviceContainer,
 			newEps := eps.DeepCopy()
 			for si := range newEps.Subsets {
 				subnet := &newEps.Subsets[si]
-				subnet.Addresses = filterLocalAppInfoConcernedAddresses(subnet.Addresses, localAppInfo)
-				subnet.NotReadyAddresses = filterLocalAppInfoConcernedAddresses(subnet.NotReadyAddresses, localAppInfo)
+				subnet.Addresses = filterLocalAppInfoConcernedAddresses(subnet.Addresses, localAppInfo[epsKey])
+				subnet.NotReadyAddresses = filterLocalAppInfoConcernedAddresses(subnet.NotReadyAddresses, localAppInfo[epsKey])
 			}
 			klog.V(4).Infof("Normal endpoints after LocalNodeInfo filter %s: subnets from %+#v to %+#v", eps.Name, eps.Subsets, newEps.Subsets)
 			return newEps
@@ -151,15 +151,37 @@ func pruneEndpoints(services map[types.NamespacedName]*serviceContainer,
 	return eps
 }
 
-func filterLocalAppInfoConcernedAddresses(addresses []v1.EndpointAddress, localAppInfo map[string]serf.Member) []v1.EndpointAddress {
+func filterLocalAppInfoConcernedAddresses(addresses []v1.EndpointAddress, members []serf.Member) []v1.EndpointAddress {
+	localAppInfo := make(map[string]serf.Member)
+	for _, member := range members {
+		localAppInfo[member.Addr.String()] = member
+	}
+
 	filteredEndpointAddresses := make([]v1.EndpointAddress, 0)
 	for i := range addresses {
 		addr := addresses[i]
 		_, found := localAppInfo[addr.IP]
 		if found && localAppInfo[addr.IP].Status == serf.StatusAlive {
 			filteredEndpointAddresses = append(filteredEndpointAddresses, addr)
+			delete(localAppInfo, addr.IP)
 		}
 	}
 
+	// TODO 剩下的如果还是alive的状态说明就是新增的ip
+	if len(localAppInfo) != 0 {
+		for _, member := range localAppInfo {
+			if member.Status == serf.StatusAlive {
+				epa := v1.EndpointAddress{
+					IP: member.Addr.String(),
+					TargetRef: &v1.ObjectReference{
+						Kind:      "Pod",
+						Namespace: member.Tags["namespace"],
+						Name:      member.Name,
+					},
+				}
+				filteredEndpointAddresses = append(filteredEndpointAddresses, epa)
+			}
+		}
+	}
 	return filteredEndpointAddresses
 }

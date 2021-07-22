@@ -7,15 +7,18 @@ import (
 	"time"
 
 	"github.com/hashicorp/serf/serf"
-	"github.com/xmwilldo/edge-service-autonomy/cmd/app-health-daemon/app/options"
-	"github.com/xmwilldo/edge-service-autonomy/pkg/app-health-daemon/server"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
+
+	"github.com/xmwilldo/edge-service-autonomy/cmd/app-health-daemon/app/options"
+	"github.com/xmwilldo/edge-service-autonomy/pkg/app-health-daemon/server"
 )
 
 type AppDaemon struct {
-	serf   *serf.Serf
-	joinIP string
+	serf      *serf.Serf
+	joinIp    string
+	namespace string
+	svcName   string
 }
 
 func NewAppDaemon(options *options.AppHealthOptions) *AppDaemon {
@@ -27,16 +30,24 @@ func NewAppDaemon(options *options.AppHealthOptions) *AppDaemon {
 	}
 
 	return &AppDaemon{
-		serf:   serf,
-		joinIP: options.JoinIP,
+		serf:      serf,
+		joinIp:    options.JoinIp,
+		namespace: options.Namespace,
+		svcName:   options.SvcName,
 	}
 }
 
 func (d *AppDaemon) Run(ctx context.Context) {
 	wg := sync.WaitGroup{}
 
-	if d.joinIP != "" {
-		_, err := d.serf.Join([]string{d.joinIP}, false)
+	err := d.serf.SetTags(map[string]string{"namespace": d.namespace, "svc_name": d.svcName})
+	if err != nil {
+		klog.Errorf("set tags err: %v", err)
+		return
+	}
+
+	if d.joinIp != "" {
+		_, err := d.serf.Join([]string{d.joinIp}, true)
 		if err != nil {
 			klog.Errorf("join serf err: %v", err)
 			return
