@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/xmwilldo/edge-service-autonomy/cmd/application-grid-wrapper/app/options"
 	"github.com/xmwilldo/edge-service-autonomy/pkg/application-grid-wrapper/server/apis"
@@ -38,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -91,8 +91,12 @@ func (s *interceptorServer) Run(debug bool, bindAddress string, insecure bool, c
 	}
 
 	if serviceAutonomyEnhancement.Enabled {
-		klog.Infof("Start to run GetLocalInfo client")
-		go wait.Until(s.AppStatusAcquisition, time.Duration(serviceAutonomyEnhancement.UpdateInterval)*time.Second, ctx.Done())
+		delayTimer := time.NewTimer(time.Second * 5)
+		go func() {
+			<-delayTimer.C
+			klog.Infof("Start to run GetLocalInfo client")
+			go wait.Until(s.AppStatusAcquisition, time.Duration(serviceAutonomyEnhancement.UpdateInterval)*time.Second, ctx.Done())
+		}()
 	}
 
 	klog.Infof("Start to run interceptor server")

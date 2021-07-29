@@ -114,7 +114,10 @@ func genLocalEndpoints(eps *v1.Endpoints) *v1.Endpoints {
 
 func pruneEndpoints(services map[types.NamespacedName]*serviceContainer,
 	eps *v1.Endpoints, localAppInfo map[types.NamespacedName][]serf.Member,
-	wrapperInCluster, serviceAutonomyEnhancementEnabled bool) *v1.Endpoints {
+	wrapperInCluster, serviceAutonomyEnhancementEnabled, appHealthReady bool) *v1.Endpoints {
+	if !appHealthReady {
+		return eps
+	}
 
 	epsKey := types.NamespacedName{Namespace: eps.Namespace, Name: eps.Name}
 
@@ -167,7 +170,6 @@ func filterLocalAppInfoConcernedAddresses(addresses []v1.EndpointAddress, member
 		}
 	}
 
-	// TODO 剩下的如果还是alive的状态说明就是新增的ip
 	if len(localAppInfo) != 0 {
 		for _, member := range localAppInfo {
 			if member.Status == serf.StatusAlive {

@@ -10,6 +10,7 @@ type ServiceAutonomyEnhancementOptions struct {
 	Enabled        bool
 	AppStatusSvc   string
 	UpdateInterval int
+	Delay          int
 }
 
 func (p ServiceAutonomyEnhancementOptions) Name() string {

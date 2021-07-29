@@ -34,6 +34,7 @@ type storageCache struct {
 	hostName                          string
 	wrapperInCluster                  bool
 	serviceAutonomyEnhancementEnabled bool
+	appHealthReady                    bool
 	//serviceAutonomyEnhancementV2Enabled bool
 
 	// mu lock protect the following map structure
@@ -147,6 +148,7 @@ func (sc *storageCache) SetLocalAppInfo(info map[types.NamespacedName][]serf.Mem
 	klog.V(4).Infof("Set local node info %#v", info)
 	sc.mu.Lock()
 	sc.localAppInfo = info
+	sc.appHealthReady = true
 
 	// update endpoints
 	changedEps := sc.rebuildEndpointsMap()
@@ -167,7 +169,7 @@ func (sc *storageCache) ClearLocalAppInfo() {
 func (sc *storageCache) rebuildEndpointsMap() []watch.Event {
 	evts := make([]watch.Event, 0)
 	for name, endpointsContainer := range sc.endpointsMap {
-		newEps := pruneEndpoints(sc.servicesMap, endpointsContainer.endpoints, sc.localAppInfo, sc.wrapperInCluster, sc.serviceAutonomyEnhancementEnabled)
+		newEps := pruneEndpoints(sc.servicesMap, endpointsContainer.endpoints, sc.localAppInfo, sc.wrapperInCluster, sc.serviceAutonomyEnhancementEnabled, sc.appHealthReady)
 		if apiequality.Semantic.DeepEqual(newEps, endpointsContainer.modified) {
 			continue
 		}

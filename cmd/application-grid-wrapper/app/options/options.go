@@ -42,7 +42,7 @@ func NewGridWrapperOptions() *Options {
 		NotifyChannelSize: 100,
 		WrapperInCluster:  true,
 		ServiceAutonomyEnhancementOption: ServiceAutonomyEnhancementOptions{
-			Enabled:        true,
+			Enabled:        false,
 			UpdateInterval: 5,
 			AppStatusSvc:   "http://10.244.5.35:8888/localinfo",
 		},
