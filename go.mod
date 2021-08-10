@@ -3,6 +3,8 @@ module github.com/xmwilldo/edge-service-autonomy
 go 1.16
 
 require (
+	github.com/ghodss/yaml v1.0.0
+	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/hashicorp/serf v0.9.5
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/spf13/cobra v1.1.1
@@ -23,12 +25,10 @@ require (
 
 replace (
 	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1
-	github.com/moby/term => github.com/moby/term v0.0.0-20200312100748-672ec06f55cd
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.8
 	gopkg.in/yaml.v3 => gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
 	k8s.io/api => k8s.io/api v0.20.5
 	k8s.io/apimachinery => k8s.io/apimachinery v0.20.5
 	k8s.io/client-go => k8s.io/client-go v0.20.5
 	k8s.io/component-base => k8s.io/component-base v0.20.5
-	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd
 )
