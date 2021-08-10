@@ -6,6 +6,7 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
+	"k8s.io/klog/v2"
 
 	"github.com/xmwilldo/edge-service-autonomy/cmd/webhook/app/options"
 	"github.com/xmwilldo/edge-service-autonomy/pkg/util"
@@ -23,6 +24,8 @@ func NewWebhookCommand() *cobra.Command {
 			if err != nil {
 				panic(err)
 			}
+
+			klog.Infof("Starting server at 0.0.0.0:%v...", o.Port)
 			go webhookServer.Start()
 
 			signalChan := make(chan os.Signal, 1)

@@ -4,7 +4,6 @@ go 1.16
 
 require (
 	github.com/ghodss/yaml v1.0.0
-	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/hashicorp/serf v0.9.5
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/spf13/cobra v1.1.1

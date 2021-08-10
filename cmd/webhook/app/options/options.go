@@ -11,10 +11,10 @@ type WebHookOptions struct {
 
 func NewWebHookOptions() WebHookOptions {
 	return WebHookOptions{
-		Port:          8888,
-		CertFile:      "/etc/webhook-demo/certs/cert.pem",
-		KeyFile:       "/etc/webhook-demo/certs/key.pem",
-		SidecarConfig: "/etc/webhook-demo/config/sidecarconfig.yaml",
+		Port:          7777,
+		CertFile:      "/etc/edge-service-autonomy-webhook/certs/cert.pem",
+		KeyFile:       "/etc/edge-service-autonomy-webhook/certs/key.pem",
+		SidecarConfig: "/etc/edge-service-autonomy-webhook/config/sidecarconfig.yaml",
 	}
 }
 
