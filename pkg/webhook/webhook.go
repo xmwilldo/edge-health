@@ -11,8 +11,10 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/xmwilldo/edge-service-autonomy/cmd/webhook/app/options"
+
 	"github.com/ghodss/yaml"
-	"k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -22,8 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/klog/v2"
-
-	"github.com/xmwilldo/edge-service-autonomy/cmd/webhook/app/options"
 )
 
 var (
@@ -95,7 +95,7 @@ func newWebHookServer(options options.WebHookOptions) (*webHookServer, error) {
 }
 
 func (ws *webHookServer) Start() {
-	if err := ws.server.ListenAndServe(); err != nil {
+	if err := ws.server.ListenAndServeTLS("", ""); err != nil {
 		klog.Errorf("Failed to listen and serve webhook server: %v", err)
 	}
 }
@@ -109,7 +109,7 @@ func (ws *webHookServer) Stop() {
 }
 
 // validate deployments and services
-func (ws *webHookServer) validating(ar *v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+func (ws *webHookServer) validating(ar *admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	req := ar.Request
 	var (
 		availableLabels                 map[string]string
@@ -125,7 +125,7 @@ func (ws *webHookServer) validating(ar *v1beta1.AdmissionReview) *v1beta1.Admiss
 		var deployment appsv1.Deployment
 		if err := json.Unmarshal(req.Object.Raw, &deployment); err != nil {
 			klog.Errorf("Could not unmarshal raw object: %v", err)
-			return &v1beta1.AdmissionResponse{
+			return &admissionv1.AdmissionResponse{
 				Result: &metav1.Status{
 					Message: err.Error(),
 				},
@@ -137,7 +137,7 @@ func (ws *webHookServer) validating(ar *v1beta1.AdmissionReview) *v1beta1.Admiss
 		var service corev1.Service
 		if err := json.Unmarshal(req.Object.Raw, &service); err != nil {
 			klog.Errorf("Could not unmarshal raw object: %v", err)
-			return &v1beta1.AdmissionResponse{
+			return &admissionv1.AdmissionResponse{
 				Result: &metav1.Status{
 					Message: err.Error(),
 				},
@@ -150,7 +150,7 @@ func (ws *webHookServer) validating(ar *v1beta1.AdmissionReview) *v1beta1.Admiss
 		var ingress extensionsv1beta1.Ingress
 		if err := json.Unmarshal(req.Object.Raw, &ingress); err != nil {
 			klog.Errorf("Could not unmarshal raw object: %v", err)
-			return &v1beta1.AdmissionResponse{
+			return &admissionv1.AdmissionResponse{
 				Result: &metav1.Status{
 					Message: err.Error(),
 				},
@@ -162,7 +162,7 @@ func (ws *webHookServer) validating(ar *v1beta1.AdmissionReview) *v1beta1.Admiss
 
 	if !validationRequired(ignoredNamespaces, objectMeta) {
 		klog.Infof("Skipping validation for %s/%s due to policy check", resourceNamespace, resourceName)
-		return &v1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: true,
 		}
 	}
@@ -181,17 +181,17 @@ func (ws *webHookServer) validating(ar *v1beta1.AdmissionReview) *v1beta1.Admiss
 		}
 	}
 
-	return &v1beta1.AdmissionResponse{
+	return &admissionv1.AdmissionResponse{
 		Allowed: allowed,
 		Result:  result,
 	}
 }
 
 // main mutation process
-func (ws *webHookServer) mutating(ar *v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+func (ws *webHookServer) mutating(ar *admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	req := ar.Request
 	var (
-		availableLabels, availableAnnotations, templateLables map[string]string
+		availableLabels, availableAnnotations, templateLabels map[string]string
 		objectMeta                                            *metav1.ObjectMeta
 		resourceNamespace, resourceName                       string
 		deployment                                            appsv1.Deployment
@@ -205,7 +205,7 @@ func (ws *webHookServer) mutating(ar *v1beta1.AdmissionReview) *v1beta1.Admissio
 
 		if err := json.Unmarshal(req.Object.Raw, &deployment); err != nil {
 			klog.Errorf("Could not unmarshal raw object: %v", err)
-			return &v1beta1.AdmissionResponse{
+			return &admissionv1.AdmissionResponse{
 				Result: &metav1.Status{
 					Message: err.Error(),
 				},
@@ -213,13 +213,13 @@ func (ws *webHookServer) mutating(ar *v1beta1.AdmissionReview) *v1beta1.Admissio
 		}
 		resourceName, resourceNamespace, objectMeta = deployment.Name, deployment.Namespace, &deployment.ObjectMeta
 		availableLabels = deployment.Labels
-		templateLables = deployment.Spec.Template.ObjectMeta.Labels
+		templateLabels = deployment.Spec.Template.ObjectMeta.Labels
 
 	case "Service":
 		var service corev1.Service
 		if err := json.Unmarshal(req.Object.Raw, &service); err != nil {
 			klog.Errorf("Could not unmarshal raw object: %v", err)
-			return &v1beta1.AdmissionResponse{
+			return &admissionv1.AdmissionResponse{
 				Result: &metav1.Status{
 					Message: err.Error(),
 				},
@@ -232,7 +232,7 @@ func (ws *webHookServer) mutating(ar *v1beta1.AdmissionReview) *v1beta1.Admissio
 		var ingress extensionsv1beta1.Ingress
 		if err := json.Unmarshal(req.Object.Raw, &ingress); err != nil {
 			klog.Errorf("Could not unmarshal raw object: %v", err)
-			return &v1beta1.AdmissionResponse{
+			return &admissionv1.AdmissionResponse{
 				Result: &metav1.Status{
 					Message: err.Error(),
 				},
@@ -244,16 +244,16 @@ func (ws *webHookServer) mutating(ar *v1beta1.AdmissionReview) *v1beta1.Admissio
 
 	if !mutationRequired(ignoredNamespaces, objectMeta) {
 		klog.Infof("Skipping validation for %s/%s due to policy check", resourceNamespace, resourceName)
-		return &v1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: true,
 		}
 	}
 
 	applyDefaultsWorkaround(ws.sidecarConfig.Containers, ws.sidecarConfig.Volumes)
 	annotations := map[string]string{admissionWebhookAnnotationStatusKey: "mutated"}
-	patchBytes, err := createPatch(&deployment, ws.sidecarConfig, availableAnnotations, annotations, availableLabels, templateLables, addLabels)
+	patchBytes, err := createPatch(&deployment, ws.sidecarConfig, availableAnnotations, annotations, availableLabels, templateLabels, addLabels)
 	if err != nil {
-		return &v1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Result: &metav1.Status{
 				Message: err.Error(),
 			},
@@ -261,11 +261,11 @@ func (ws *webHookServer) mutating(ar *v1beta1.AdmissionReview) *v1beta1.Admissio
 	}
 
 	klog.Infof("AdmissionResponse: patch=%v\n", string(patchBytes))
-	return &v1beta1.AdmissionResponse{
+	return &admissionv1.AdmissionResponse{
 		Allowed: true,
 		Patch:   patchBytes,
-		PatchType: func() *v1beta1.PatchType {
-			pt := v1beta1.PatchTypeJSONPatch
+		PatchType: func() *admissionv1.PatchType {
+			pt := admissionv1.PatchTypeJSONPatch
 			return &pt
 		}(),
 	}
@@ -293,11 +293,11 @@ func (ws *webHookServer) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var admissionResponse *v1beta1.AdmissionResponse
-	ar := v1beta1.AdmissionReview{}
+	var admissionResponse *admissionv1.AdmissionResponse
+	ar := admissionv1.AdmissionReview{}
 	if _, _, err := deserializer.Decode(body, nil, &ar); err != nil {
 		klog.Errorf("Can't decode body: %v", err)
-		admissionResponse = &v1beta1.AdmissionResponse{
+		admissionResponse = &admissionv1.AdmissionResponse{
 			Result: &metav1.Status{
 				Message: err.Error(),
 			},
@@ -311,7 +311,12 @@ func (ws *webHookServer) serve(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	admissionReview := v1beta1.AdmissionReview{}
+	admissionReview := admissionv1.AdmissionReview{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "AdmissionReview",
+			APIVersion: "admission.k8s.io/v1",
+		},
+	}
 	if admissionResponse != nil {
 		admissionReview.Response = admissionResponse
 		if ar.Request != nil {
@@ -324,7 +329,7 @@ func (ws *webHookServer) serve(w http.ResponseWriter, r *http.Request) {
 		klog.Errorf("Can't encode response: %v", err)
 		http.Error(w, fmt.Sprintf("could not encode response: %v", err), http.StatusInternalServerError)
 	}
-	klog.Infof("Ready to write reponse ...")
+	klog.Infof("Ready to write response ...")
 	if _, err := w.Write(resp); err != nil {
 		klog.Errorf("Can't write response: %v", err)
 		http.Error(w, fmt.Sprintf("could not write response: %v", err), http.StatusInternalServerError)
