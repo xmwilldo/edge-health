@@ -3,15 +3,14 @@ package webhook
 import (
 	"context"
 	"crypto/sha256"
-	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"reflect"
 	"strings"
 
 	"github.com/xmwilldo/edge-service-autonomy/cmd/webhook/app/options"
+	"github.com/xmwilldo/edge-service-autonomy/pkg/util"
 
 	"github.com/ghodss/yaml"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -19,11 +18,10 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 var (
@@ -31,29 +29,15 @@ var (
 		metav1.NamespaceSystem,
 		metav1.NamespacePublic,
 	}
-	requiredLabels = []string{
-		nameLabel,
-	}
-	addLabels = map[string]string{
-		nameLabel: NA,
-	}
 )
 
 const (
-	admissionWebhookAnnotationValidateKey = "edge-service-autonomy/validate"
-	admissionWebhookAnnotationMutateKey   = "edge-service-autonomy/mutate"
-	admissionWebhookAnnotationStatusKey   = "edge-service-autonomy/status"
-
-	nameLabel = "app.kubernetes.io/name"
-
-	NA = "not_available"
+	admissionWebhookAnnotationMutateKey = "edge-service-autonomy/enabled"
+	admissionWebhookAnnotationStatusKey = "edge-service-autonomy/status"
 )
 
 var (
 	runtimeScheme = runtime.NewScheme()
-	codecs        = serializer.NewCodecFactory(runtimeScheme)
-	deserializer  = codecs.UniversalDeserializer()
-	defaulter     = runtime.ObjectDefaulter(runtimeScheme)
 )
 
 func init() {
@@ -62,134 +46,20 @@ func init() {
 	_ = v1.AddToScheme(runtimeScheme)
 }
 
-func NewWebhookServer(options options.WebHookOptions) (Server, error) {
-	return newWebHookServer(options)
-}
+var _ admission.Handler = &EdgeServiceAutonomy{}
 
-func newWebHookServer(options options.WebHookOptions) (*webHookServer, error) {
-	//load tls cert/key file
-	tlsCertKey, err := tls.LoadX509KeyPair(options.CertFile, options.KeyFile)
-	if err != nil {
-		return nil, err
-	}
-
-	ws := &webHookServer{
-		server: &http.Server{
-			Addr:      fmt.Sprintf(":%v", options.Port),
-			TLSConfig: &tls.Config{Certificates: []tls.Certificate{tlsCertKey}},
-		},
-	}
-
+func NewEdgeServiceAutonomy(options options.WebHookOptions) (*EdgeServiceAutonomy, error) {
 	sidecarConfig, err := loadConfig(options.SidecarConfig)
 	if err != nil {
 		return nil, err
 	}
-
-	// add routes
-	mux := http.NewServeMux()
-	mux.HandleFunc("/mutating", ws.serve)
-	mux.HandleFunc("/validating", ws.serve)
-	ws.server.Handler = mux
-	ws.sidecarConfig = sidecarConfig
-	return ws, nil
+	return &EdgeServiceAutonomy{
+		sidecarConfig: sidecarConfig,
+	}, nil
 }
 
-func (ws *webHookServer) Start() {
-	if err := ws.server.ListenAndServeTLS("", ""); err != nil {
-		klog.Errorf("Failed to listen and serve webhook server: %v", err)
-	}
-}
-
-func (ws *webHookServer) Stop() {
-	klog.Infof("Got OS shutdown signal, shutting down webhook server gracefully...")
-	err := ws.server.Shutdown(context.Background())
-	if err != nil {
-		panic(err)
-	}
-}
-
-// validate deployments and services
-func (ws *webHookServer) validating(ar *admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
-	req := ar.Request
-	var (
-		availableLabels                 map[string]string
-		objectMeta                      *metav1.ObjectMeta
-		resourceNamespace, resourceName string
-	)
-
-	klog.Infof("AdmissionReview for Kind=%v, Namespace=%v Name=%v (%v) UID=%v patchOperation=%v UserInfo=%v",
-		req.Kind, req.Namespace, req.Name, resourceName, req.UID, req.Operation, req.UserInfo)
-
-	switch req.Kind.Kind {
-	case "Deployment":
-		var deployment appsv1.Deployment
-		if err := json.Unmarshal(req.Object.Raw, &deployment); err != nil {
-			klog.Errorf("Could not unmarshal raw object: %v", err)
-			return &admissionv1.AdmissionResponse{
-				Result: &metav1.Status{
-					Message: err.Error(),
-				},
-			}
-		}
-		resourceName, resourceNamespace, objectMeta = deployment.Name, deployment.Namespace, &deployment.ObjectMeta
-		availableLabels = deployment.Labels
-	case "Service":
-		var service corev1.Service
-		if err := json.Unmarshal(req.Object.Raw, &service); err != nil {
-			klog.Errorf("Could not unmarshal raw object: %v", err)
-			return &admissionv1.AdmissionResponse{
-				Result: &metav1.Status{
-					Message: err.Error(),
-				},
-			}
-		}
-		resourceName, resourceNamespace, objectMeta = service.Name, service.Namespace, &service.ObjectMeta
-		availableLabels = service.Labels
-
-	case "Ingress":
-		var ingress extensionsv1beta1.Ingress
-		if err := json.Unmarshal(req.Object.Raw, &ingress); err != nil {
-			klog.Errorf("Could not unmarshal raw object: %v", err)
-			return &admissionv1.AdmissionResponse{
-				Result: &metav1.Status{
-					Message: err.Error(),
-				},
-			}
-		}
-		resourceName, resourceNamespace, objectMeta = ingress.Name, ingress.Namespace, &ingress.ObjectMeta
-		availableLabels = ingress.Labels
-	}
-
-	if !validationRequired(ignoredNamespaces, objectMeta) {
-		klog.Infof("Skipping validation for %s/%s due to policy check", resourceNamespace, resourceName)
-		return &admissionv1.AdmissionResponse{
-			Allowed: true,
-		}
-	}
-
-	allowed := true
-	var result *metav1.Status
-	klog.Info("available labels:", availableLabels)
-	klog.Info("required labels", requiredLabels)
-	for _, rl := range requiredLabels {
-		if _, ok := availableLabels[rl]; !ok {
-			allowed = false
-			result = &metav1.Status{
-				Reason: "required labels are not set",
-			}
-			break
-		}
-	}
-
-	return &admissionv1.AdmissionResponse{
-		Allowed: allowed,
-		Result:  result,
-	}
-}
-
-// main mutation process
-func (ws *webHookServer) mutating(ar *admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
-	req := ar.Request
+func (e *EdgeServiceAutonomy) Handle(ctx context.Context, req admission.Request) admission.Response {
+	response := admission.Response{}
 	var (
 		availableLabels, availableAnnotations, templateLabels map[string]string
 		objectMeta                                            *metav1.ObjectMeta
@@ -202,138 +72,57 @@ func (ws *webHookServer) mutating(ar *admissionv1.AdmissionReview) *admissionv1.
 
 	switch req.Kind.Kind {
 	case "Deployment":
+		klog.V(4).Infof("Mutating admission Deployment AdmissionRequest = %s", util.AdmissionRequestDebugString(req))
 
 		if err := json.Unmarshal(req.Object.Raw, &deployment); err != nil {
 			klog.Errorf("Could not unmarshal raw object: %v", err)
-			return &admissionv1.AdmissionResponse{
-				Result: &metav1.Status{
-					Message: err.Error(),
+			return admission.Response{
+				AdmissionResponse: admissionv1.AdmissionResponse{
+					Allowed: false,
+					Result: &metav1.Status{
+						Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+						Message: err.Error(),
+					},
 				},
 			}
 		}
+
+		klog.V(4).Infof("Admitting deployment = %+v", deployment)
+
 		resourceName, resourceNamespace, objectMeta = deployment.Name, deployment.Namespace, &deployment.ObjectMeta
 		availableLabels = deployment.Labels
 		templateLabels = deployment.Spec.Template.ObjectMeta.Labels
-
-	case "Service":
-		var service corev1.Service
-		if err := json.Unmarshal(req.Object.Raw, &service); err != nil {
-			klog.Errorf("Could not unmarshal raw object: %v", err)
-			return &admissionv1.AdmissionResponse{
-				Result: &metav1.Status{
-					Message: err.Error(),
-				},
-			}
-		}
-		resourceName, resourceNamespace, objectMeta = service.Name, service.Namespace, &service.ObjectMeta
-		availableLabels = service.Labels
-
-	case "Ingress":
-		var ingress extensionsv1beta1.Ingress
-		if err := json.Unmarshal(req.Object.Raw, &ingress); err != nil {
-			klog.Errorf("Could not unmarshal raw object: %v", err)
-			return &admissionv1.AdmissionResponse{
-				Result: &metav1.Status{
-					Message: err.Error(),
-				},
-			}
-		}
-		resourceName, resourceNamespace, objectMeta = ingress.Name, ingress.Namespace, &ingress.ObjectMeta
-		availableLabels = ingress.Labels
 	}
 
 	if !mutationRequired(ignoredNamespaces, objectMeta) {
-		klog.Infof("Skipping validation for %s/%s due to policy check", resourceNamespace, resourceName)
-		return &admissionv1.AdmissionResponse{
-			Allowed: true,
+		klog.Infof("Skipping mutation for %s/%s due to policy check", resourceNamespace, resourceName)
+		return admission.Response{
+			AdmissionResponse: admissionv1.AdmissionResponse{
+				Allowed: true,
+			},
 		}
 	}
 
-	applyDefaultsWorkaround(ws.sidecarConfig.Containers, ws.sidecarConfig.Volumes)
-	annotations := map[string]string{admissionWebhookAnnotationStatusKey: "mutated"}
-	patchBytes, err := createPatch(&deployment, ws.sidecarConfig, availableAnnotations, annotations, availableLabels, templateLabels, addLabels)
+	annotations := map[string]string{admissionWebhookAnnotationStatusKey: "enabled"}
+	patchBytes, err := createPatch(&deployment, e.sidecarConfig, availableAnnotations, annotations, availableLabels, templateLabels, nil)
 	if err != nil {
-		return &admissionv1.AdmissionResponse{
-			Result: &metav1.Status{
-				Message: err.Error(),
+		return admission.Response{
+			AdmissionResponse: admissionv1.AdmissionResponse{
+				Allowed: false,
+				Result: &metav1.Status{
+					Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+					Message: err.Error(),
+				},
 			},
 		}
 	}
 
 	klog.Infof("AdmissionResponse: patch=%v\n", string(patchBytes))
-	return &admissionv1.AdmissionResponse{
-		Allowed: true,
-		Patch:   patchBytes,
-		PatchType: func() *admissionv1.PatchType {
-			pt := admissionv1.PatchTypeJSONPatch
-			return &pt
-		}(),
-	}
-}
-
-// Serve method for webhook server
-func (ws *webHookServer) serve(w http.ResponseWriter, r *http.Request) {
-	var body []byte
-	if r.Body != nil {
-		if data, err := ioutil.ReadAll(r.Body); err == nil {
-			body = data
-		}
-	}
-	if len(body) == 0 {
-		klog.Error("empty body")
-		http.Error(w, "empty body", http.StatusBadRequest)
-		return
-	}
-
-	// verify the content type is accurate
-	contentType := r.Header.Get("Content-Type")
-	if contentType != "application/json" {
-		klog.Errorf("Content-Type=%s, expect application/json", contentType)
-		http.Error(w, "invalid Content-Type, expect `application/json`", http.StatusUnsupportedMediaType)
-		return
-	}
-
-	var admissionResponse *admissionv1.AdmissionResponse
-	ar := admissionv1.AdmissionReview{}
-	if _, _, err := deserializer.Decode(body, nil, &ar); err != nil {
-		klog.Errorf("Can't decode body: %v", err)
-		admissionResponse = &admissionv1.AdmissionResponse{
-			Result: &metav1.Status{
-				Message: err.Error(),
-			},
-		}
-	} else {
-		fmt.Println(r.URL.Path)
-		if r.URL.Path == "/mutating" {
-			admissionResponse = ws.mutating(&ar)
-		} else if r.URL.Path == "/validating" {
-			admissionResponse = ws.validating(&ar)
-		}
-	}
-
-	admissionReview := admissionv1.AdmissionReview{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "AdmissionReview",
-			APIVersion: "admission.k8s.io/v1",
-		},
-	}
-	if admissionResponse != nil {
-		admissionReview.Response = admissionResponse
-		if ar.Request != nil {
-			admissionReview.Response.UID = ar.Request.UID
-		}
-	}
-
-	resp, err := json.Marshal(admissionReview)
-	if err != nil {
-		klog.Errorf("Can't encode response: %v", err)
-		http.Error(w, fmt.Sprintf("could not encode response: %v", err), http.StatusInternalServerError)
-	}
-	klog.Infof("Ready to write response ...")
-	if _, err := w.Write(resp); err != nil {
-		klog.Errorf("Can't write response: %v", err)
-		http.Error(w, fmt.Sprintf("could not write response: %v", err), http.StatusInternalServerError)
-	}
+	response.PatchType = new(admissionv1.PatchType)
+	*response.PatchType = admissionv1.PatchTypeJSONPatch
+	response.Patch = patchBytes
+	response.Allowed = true
+	return response
 }
 
 func admissionRequired(ignoredList []string, admissionAnnotationKey string, metadata *metav1.ObjectMeta) bool {
@@ -368,17 +157,11 @@ func mutationRequired(ignoredList []string, metadata *metav1.ObjectMeta) bool {
 	}
 	status := annotations[admissionWebhookAnnotationStatusKey]
 
-	if strings.ToLower(status) == "mutated" {
+	if strings.ToLower(status) == "enabled" {
 		required = false
 	}
 
 	klog.Infof("Mutation policy for %v/%v: required:%v", metadata.Namespace, metadata.Name, required)
-	return required
-}
-
-func validationRequired(ignoredList []string, metadata *metav1.ObjectMeta) bool {
-	required := admissionRequired(ignoredList, admissionWebhookAnnotationValidateKey, metadata)
-	klog.Infof("Validation policy for %v/%v: required:%v", metadata.Namespace, metadata.Name, required)
 	return required
 }
 
@@ -419,7 +202,7 @@ func updateLabels(target map[string]string, added map[string]string) (patch []pa
 	return patch
 }
 
-func updateTemplateLables(target map[string]string, added map[string]string) (patch []patchOperation) {
+func updateTemplateLabels(target map[string]string, added map[string]string) (patch []patchOperation) {
 	values := target
 	for key, value := range added {
 		v, ok := values[key]
@@ -439,13 +222,12 @@ func updateTemplateLables(target map[string]string, added map[string]string) (pa
 	return patch
 }
 
-func createPatch(deployment *appsv1.Deployment, sidecarConfig *Config, availableAnnotations map[string]string, annotations map[string]string, availableLabels map[string]string, templateLables map[string]string, labels map[string]string) ([]byte, error) {
+func createPatch(deployment *appsv1.Deployment, sidecarConfig *Config, availableAnnotations map[string]string, annotations map[string]string, availableLabels map[string]string, templateLabels map[string]string, labels map[string]string) ([]byte, error) {
 	var patch []patchOperation
 
 	if !reflect.DeepEqual(deployment, &appsv1.Deployment{}) {
 		patch = append(patch, addContainer(deployment.Spec.Template.Spec.Containers, sidecarConfig.Containers, "/spec/template/spec/containers")...)
-		patch = append(patch, addVolume(deployment.Spec.Template.Spec.Volumes, sidecarConfig.Volumes, "/spec/template/spec/volumes")...)
-		patch = append(patch, updateTemplateLables(templateLables, labels)...)
+		patch = append(patch, updateTemplateLabels(templateLabels, labels)...)
 	}
 	patch = append(patch, updateAnnotation(availableAnnotations, annotations)...)
 	patch = append(patch, updateLabels(availableLabels, labels)...)
@@ -474,27 +256,6 @@ func addContainer(target, added []corev1.Container, basePath string) (patch []pa
 	return patch
 }
 
-func addVolume(target, added []corev1.Volume, basePath string) (patch []patchOperation) {
-	first := len(target) == 0
-	var value interface{}
-	for _, add := range added {
-		value = add
-		path := basePath
-		if first {
-			first = false
-			value = []corev1.Volume{add}
-		} else {
-			path = path + "/-"
-		}
-		patch = append(patch, patchOperation{
-			Op:    "add",
-			Path:  path,
-			Value: value,
-		})
-	}
-	return patch
-}
-
 func loadConfig(configFile string) (*Config, error) {
 	data, err := ioutil.ReadFile(configFile)
 	if err != nil {
@@ -508,13 +269,4 @@ func loadConfig(configFile string) (*Config, error) {
 	}
 
 	return &cfg, nil
-}
-
-func applyDefaultsWorkaround(containers []corev1.Container, volumes []corev1.Volume) {
-	defaulter.Default(&corev1.Pod{
-		Spec: corev1.PodSpec{
-			Containers: containers,
-			Volumes:    volumes,
-		},
-	})
 }
