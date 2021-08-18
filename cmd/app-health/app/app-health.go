@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/xmwilldo/edge-health/cmd/app-health-daemon/app/options"
+	"github.com/xmwilldo/edge-health/cmd/app-health/app/options"
 	"github.com/xmwilldo/edge-health/pkg/app-health-daemon/daemon"
 	"github.com/xmwilldo/edge-health/pkg/util"
 )

@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/xmwilldo/edge-health/cmd/app-health-daemon/app"
+	"github.com/xmwilldo/edge-health/cmd/app-health/app"
 	"github.com/xmwilldo/edge-health/pkg/app-health-daemon/util"
 
 	"k8s.io/component-base/logs"
