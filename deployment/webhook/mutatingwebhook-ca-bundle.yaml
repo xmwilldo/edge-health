@@ -1,0 +1,26 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: mutating-webhook-esa-cfg
+  labels:
+    app: mutating-webhook-esa
+webhooks:
+  - name: mutating-esa.xmwillgo.com
+    sideEffects: NoneOnDryRun
+    admissionReviewVersions: ["v1", "v1beta1"]
+    clientConfig:
+      caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUN5RENDQWJDZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwcmRXSmwKY201bGRHVnpNQjRYRFRJeE1EVXlNREF6TVRBeU5sb1hEVE14TURVeE9EQXpNVEF5Tmxvd0ZURVRNQkVHQTFVRQpBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBTWNHCmZnNVdyQ2M3TmdneUhXdnB3ODg2b28zTnZRdFphZE9scDNnVUpIaGZmZjVlbldDRllxRzR5Ui9KcTZXMzUyeGwKOThwSkYvWi9tOFNaaG9BRkZzVE9LZHhwYW5TSFZxK21IUktmVUZxejNNcVNvRmtuUzYvU0RGYnpJSFBzY0JzSQplNTRrT3FMTnl2ZlpZZDA1YXNCNUJCMFJ2YkpCdm5Uc3pxb3ZONThPd1RVVUc5bUVwYzFOdHM0c09pdkxLaVFyCmt5azVzZmFWOFF3MU5zU0xxV3l0SFYweGFxZGgwbXRRay9RN3lmdGQvK0s5V2NvaWhDY2tHR2VxeCswQUsyUzAKVytvMEtXYVVjMkZxNWpydWMxcDhaTzQ2OWdoMTdyWXNHQWF6c05iWDVVNVBLOGtGSldWeEtKRlhsYWM2Vk9xSwp2ZXdiYVlCOWw2Yk9PTEtKRk9NQ0F3RUFBYU1qTUNFd0RnWURWUjBQQVFIL0JBUURBZ0trTUE4R0ExVWRFd0VCCi93UUZNQU1CQWY4d0RRWUpLb1pJaHZjTkFRRUxCUUFEZ2dFQkFHOFRHM1lWbHBDOU1zUXVCSTFCamYwWFhReFYKTnJCYUNCN3dNMGVBV3FUOUlwY29wS1RHMzJmQWFvRkRlQ3FTbnE2U09uUU9KWjFtNUk3N1RqSUhLT2VBcXQ4TApUdmFPVytpaGhNcC85OE5oK2lvdkJ6djBjQnV3MmZNSlZNZWs3YzVIbDlBWXRaeWx6NDNVS2oyTnZpRWo0TE5ECjhpTlBRblVZOVZkR1VwMTJiUUVaQWI3V2U5ZG56MDZ6MmlBcjQxeWM5VldHNU16ZXh3MEtPM1FKby9uTWFhMFYKb3VMRzV6MUNvV1o0TEsveEc2Ymd2aTltMExIaVc4R1ZldkQwUW4vWXZPYXF5VFc4NXhoOWtJazVJdGJteHArVgpnR0V0bUVEVHREaytmcVdwdGFPdDhibFk2MDcrL3dQRFc3a3lvaE01V1daaUlGVmhSNCtEVGVFZUtpWT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+      # service:
+      #   name: admission-webhook-esa-svc
+      #   namespace: default
+      #   path: "/mutating"
+      url: "https://10.10.101.190/mutating"
+    rules:
+      - operations: [ "CREATE" ]
+        apiGroups: ["apps", "extensions", ""]
+        apiVersions: ["v1", "v1beta1"]
+        resources: ["deployments"]
+    namespaceSelector:
+      matchLabels:
+        edge-service-autonomy: enabled
+

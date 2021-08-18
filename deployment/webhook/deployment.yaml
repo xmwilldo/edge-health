@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admission-webhook-esa
+  labels:
+    app: admission-webhook-esa
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: admission-webhook-esa
+  template:
+    metadata:
+      labels:
+        app: admission-webhook-esa
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: hcy-190-debian
+      containers:
+        - name: admission-webhook-esa
+          image: xmwilldo/edge-service-autonomy-admission-webhook
+          imagePullPolicy: IfNotPresent
+          command:
+            - "./webhook"
+          args:
+            - --cert_dir=/etc/webhook/certs
+            - --sidecar_config=/etc/webhook/config/sidecarconfig.yaml
+          volumeMounts:
+            - name: webhook-certs
+              mountPath: /etc/webhook/certs
+              readOnly: true
+            - name: webhook-config
+              mountPath: /etc/webhook/config
+      volumes:
+        - name: webhook-certs
+          secret:
+            secretName: admission-webhook-esa-certs
+        - name: webhook-config
+          configMap:
+            name: edge-service-autonomy-webhook-configmap
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: admission-webhook-esa-svc
+  labels:
+    app: admission-webhook-esa-svc
+spec:
+  ports:
+    - port: 443
+      targetPort: 443
+      nodePort: 30443
+  type: NodePort
+  selector:
+    app: admission-webhook-esa

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/component-base/logs"
-
 	"github.com/xmwilldo/edge-service-autonomy/cmd/webhook/app"
+
+	"k8s.io/component-base/logs"
 )
 
 func main() {

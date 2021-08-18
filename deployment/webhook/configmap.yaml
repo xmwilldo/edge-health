@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: edge-service-autonomy-webhook-configmap
+data:
+  sidecarconfig.yaml: |
+    containers:
+      - name: app-health-daemon
+        image: app-health
+        imagePullPolicy: IfNotPresent
+        command: ["./app-health"]
+        ports:
+          - containerPort: 7946
+          - containerPort: 7070
