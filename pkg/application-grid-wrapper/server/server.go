@@ -28,9 +28,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/xmwilldo/edge-service-autonomy/cmd/application-grid-wrapper/app/options"
-	"github.com/xmwilldo/edge-service-autonomy/pkg/application-grid-wrapper/server/apis"
-	"github.com/xmwilldo/edge-service-autonomy/pkg/application-grid-wrapper/storage"
+	"github.com/xmwilldo/edge-health/cmd/application-grid-wrapper/app/options"
+	"github.com/xmwilldo/edge-health/pkg/application-grid-wrapper/server/apis"
+	"github.com/xmwilldo/edge-health/pkg/application-grid-wrapper/storage"
 
 	"github.com/hashicorp/serf/serf"
 	v1 "k8s.io/api/core/v1"

@@ -13,10 +13,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	ctrwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/xmwilldo/edge-service-autonomy/cmd/webhook/app/options"
-	"github.com/xmwilldo/edge-service-autonomy/pkg/util"
-	"github.com/xmwilldo/edge-service-autonomy/pkg/version"
-	"github.com/xmwilldo/edge-service-autonomy/pkg/webhook"
+	"github.com/xmwilldo/edge-health/cmd/webhook/app/options"
+	"github.com/xmwilldo/edge-health/pkg/util"
+	"github.com/xmwilldo/edge-health/pkg/version"
+	"github.com/xmwilldo/edge-health/pkg/webhook"
 )
 
 func NewWebhookCommand() *cobra.Command {

@@ -9,8 +9,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/xmwilldo/edge-service-autonomy/cmd/webhook/app/options"
-	"github.com/xmwilldo/edge-service-autonomy/pkg/util"
+	"github.com/xmwilldo/edge-health/cmd/webhook/app/options"
+	"github.com/xmwilldo/edge-health/pkg/util"
 
 	"github.com/ghodss/yaml"
 	admissionv1 "k8s.io/api/admission/v1"

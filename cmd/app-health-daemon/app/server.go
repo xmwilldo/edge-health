@@ -5,9 +5,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/xmwilldo/edge-service-autonomy/cmd/app-health-daemon/app/options"
-	"github.com/xmwilldo/edge-service-autonomy/pkg/app-health-daemon/daemon"
-	"github.com/xmwilldo/edge-service-autonomy/pkg/util"
+	"github.com/xmwilldo/edge-health/cmd/app-health-daemon/app/options"
+	"github.com/xmwilldo/edge-health/pkg/app-health-daemon/daemon"
+	"github.com/xmwilldo/edge-health/pkg/util"
 )
 
 func NewAppHealthCommand(ctx context.Context) *cobra.Command {

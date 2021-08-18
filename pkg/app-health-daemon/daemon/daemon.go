@@ -10,8 +10,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 
-	"github.com/xmwilldo/edge-service-autonomy/cmd/app-health-daemon/app/options"
-	"github.com/xmwilldo/edge-service-autonomy/pkg/app-health-daemon/server"
+	"github.com/xmwilldo/edge-health/cmd/app-health-daemon/app/options"
+	"github.com/xmwilldo/edge-health/pkg/app-health-daemon/server"
 )
 
 type AppDaemon struct {

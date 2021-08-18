@@ -1,4 +1,4 @@
-module github.com/xmwilldo/edge-service-autonomy
+module github.com/xmwilldo/edge-health
 
 go 1.16
 

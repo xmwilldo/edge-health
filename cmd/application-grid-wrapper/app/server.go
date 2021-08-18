@@ -19,9 +19,9 @@ package app
 import (
 	"k8s.io/klog"
 
-	"github.com/xmwilldo/edge-service-autonomy/cmd/application-grid-wrapper/app/options"
-	"github.com/xmwilldo/edge-service-autonomy/pkg/application-grid-wrapper/server"
-	"github.com/xmwilldo/edge-service-autonomy/pkg/util"
+	"github.com/xmwilldo/edge-health/cmd/application-grid-wrapper/app/options"
+	"github.com/xmwilldo/edge-health/pkg/application-grid-wrapper/server"
+	"github.com/xmwilldo/edge-health/pkg/util"
 
 	"github.com/spf13/cobra"
 )

@@ -11,7 +11,7 @@ import (
 	log "k8s.io/klog"
 	"k8s.io/klog/v2"
 
-	"github.com/xmwilldo/edge-service-autonomy/pkg/util"
+	"github.com/xmwilldo/edge-health/pkg/util"
 )
 
 func Server(ctx context.Context, wg *sync.WaitGroup, serf *serf.Serf) {

@@ -26,7 +26,7 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 
-	"github.com/xmwilldo/edge-service-autonomy/cmd/application-grid-wrapper/app"
+	"github.com/xmwilldo/edge-health/cmd/application-grid-wrapper/app"
 )
 
 // TODO: this component will be deprecated in future in support of kubernetes native serviceTopology feature.

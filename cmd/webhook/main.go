@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/xmwilldo/edge-service-autonomy/cmd/webhook/app"
+	"github.com/xmwilldo/edge-health/cmd/webhook/app"
 
 	"k8s.io/component-base/logs"
 )
